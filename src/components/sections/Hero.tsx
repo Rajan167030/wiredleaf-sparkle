@@ -1,31 +1,23 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Canvas } from '@react-three/fiber';
-import { Text3D, OrbitControls, Float } from '@react-three/drei';
+import { OrbitControls, Float } from '@react-three/drei';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Bot, Code, Palette, TrendingUp, Sparkles } from 'lucide-react';
 
-const ThreeText = () => {
+const ThreeScene = () => {
   return (
-    <Float speed={2} rotationIntensity={0.5} floatIntensity={0.5}>
-      <Text3D
-        font="/fonts/helvetiker_regular.typeface.json"
-        size={1}
-        height={0.2}
-        curveSegments={12}
-        bevelEnabled
-        bevelThickness={0.02}
-        bevelSize={0.02}
-        bevelOffset={0}
-        bevelSegments={5}
-      >
-        WiredLeaf
+    <Float speed={2} rotationIntensity={0.1} floatIntensity={0.3}>
+      <mesh>
+        <boxGeometry args={[2, 0.5, 0.2]} />
         <meshStandardMaterial
           color="#00bfff"
           emissive="#00bfff"
-          emissiveIntensity={0.3}
+          emissiveIntensity={0.2}
+          transparent
+          opacity={0.8}
         />
-      </Text3D>
+      </mesh>
     </Float>
   );
 };
@@ -101,7 +93,7 @@ export const Hero = () => {
         <Canvas camera={{ position: [0, 0, 5] }}>
           <ambientLight intensity={0.5} />
           <pointLight position={[10, 10, 10]} />
-          <ThreeText />
+          <ThreeScene />
           <OrbitControls enableZoom={false} enablePan={false} />
         </Canvas>
       </div>
