@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar, Clock, User, Phone, Mail, MessageSquare, CheckCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface BookingFormProps {
   isOpen: boolean;
@@ -53,11 +54,25 @@ export const BookingForm = ({ isOpen, onClose }: BookingFormProps) => {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Demo submission
-    setTimeout(() => {
+    try {
+      const { error } = await supabase
+        .from('consultations')
+        .insert({
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          service: formData.service,
+          preferred_date: formData.date,
+          preferred_time: formData.time,
+          message: formData.message,
+          status: 'pending'
+        });
+
+      if (error) throw error;
+
       setIsSubmitted(true);
       toast({
         title: "Booking Confirmed! 🎉",
@@ -67,9 +82,25 @@ export const BookingForm = ({ isOpen, onClose }: BookingFormProps) => {
       // Reset after 3 seconds
       setTimeout(() => {
         setIsSubmitted(false);
+        setFormData({
+          name: '',
+          email: '',
+          phone: '',
+          service: '',
+          date: '',
+          time: '',
+          message: ''
+        });
         onClose();
       }, 3000);
-    }, 1000);
+    } catch (error) {
+      console.error('Error submitting consultation:', error);
+      toast({
+        title: "Error",
+        description: "Failed to submit consultation. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   if (!isOpen) return null;

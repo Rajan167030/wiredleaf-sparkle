@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Mail, Phone, MapPin, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 const faqs = [
   {
@@ -21,6 +24,57 @@ const faqs = [
 ];
 
 const Contact = () => {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    subject: '',
+    message: ''
+  });
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setFormData(prev => ({
+      ...prev,
+      [e.target.name]: e.target.value
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      const { error } = await supabase
+        .from('consultations')
+        .insert({
+          name: formData.name,
+          email: formData.email,
+          service: formData.subject,
+          message: formData.message,
+          status: 'pending'
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Message Sent! 🎉",
+        description: "We'll get back to you within 24 hours.",
+      });
+
+      setFormData({
+        name: '',
+        email: '',
+        subject: '',
+        message: ''
+      });
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen pt-16">
       <section className="py-20">
@@ -46,14 +100,44 @@ const Contact = () => {
               className="glass-card p-8"
             >
               <h2 className="text-2xl font-bold mb-6">Send Message</h2>
-              <form className="space-y-6">
+              <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input placeholder="Your Name" className="bg-background/50" />
-                  <Input placeholder="Your Email" type="email" className="bg-background/50" />
+                  <Input 
+                    name="name"
+                    placeholder="Your Name" 
+                    className="bg-background/50"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    required
+                  />
+                  <Input 
+                    name="email"
+                    placeholder="Your Email" 
+                    type="email" 
+                    className="bg-background/50"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    required
+                  />
                 </div>
-                <Input placeholder="Subject" className="bg-background/50" />
-                <Textarea placeholder="Your Message" rows={6} className="bg-background/50" />
-                <Button className="w-full ripple bg-gradient-primary hover:shadow-neon">
+                <Input 
+                  name="subject"
+                  placeholder="Subject" 
+                  className="bg-background/50"
+                  value={formData.subject}
+                  onChange={handleInputChange}
+                  required
+                />
+                <Textarea 
+                  name="message"
+                  placeholder="Your Message" 
+                  rows={6} 
+                  className="bg-background/50"
+                  value={formData.message}
+                  onChange={handleInputChange}
+                  required
+                />
+                <Button type="submit" className="w-full ripple bg-gradient-primary hover:shadow-neon">
                   <Send className="w-4 h-4 mr-2" />
                   Send Message
                 </Button>
