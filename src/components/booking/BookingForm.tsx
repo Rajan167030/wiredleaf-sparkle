@@ -73,6 +73,22 @@ export const BookingForm = ({ isOpen, onClose }: BookingFormProps) => {
 
       if (error) throw error;
 
+      // Send email notification
+      await supabase.functions.invoke('send-notification', {
+        body: {
+          type: 'consultation',
+          userEmail: formData.email,
+          userName: formData.name,
+          data: {
+            phone: formData.phone,
+            service: formData.service,
+            preferredDate: formData.date,
+            preferredTime: formData.time,
+            message: formData.message
+          }
+        }
+      });
+
       setIsSubmitted(true);
       toast({
         title: "Booking Confirmed! 🎉",

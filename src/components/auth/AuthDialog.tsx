@@ -36,6 +36,15 @@ export const AuthDialog = ({ isOpen, onClose, onSuccess }: AuthDialogProps) => {
 
         if (error) throw error;
 
+        // Send login notification
+        await supabase.functions.invoke('send-notification', {
+          body: {
+            type: 'login',
+            userEmail: formData.email,
+            userName: formData.name || formData.email.split('@')[0]
+          }
+        });
+
         toast({
           title: "Welcome back!",
           description: "Successfully logged in.",
