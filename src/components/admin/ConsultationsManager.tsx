@@ -70,12 +70,20 @@ export function ConsultationsManager() {
 
   const updateConsultationStatus = async (id: string, status: string) => {
     try {
+      const consultation = consultations.find(c => c.id === id);
+      if (!consultation) return;
+
       const { error } = await supabase
         .from('consultations')
         .update({ status, updated_at: new Date().toISOString() })
         .eq('id', id);
 
       if (error) throw error;
+
+      // If approved, create meeting and send notification
+      if (status === 'approved') {
+        await approveConsultation(consultation);
+      }
 
       await fetchConsultations();
       toast({
@@ -87,6 +95,71 @@ export function ConsultationsManager() {
       toast({
         title: "Error",
         description: "Failed to update consultation status",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const approveConsultation = async (consultation: Consultation) => {
+    try {
+      // Generate Google Meet link
+      const meetingId = Math.random().toString(36).substring(2, 15);
+      const googleMeetLink = `https://meet.google.com/${meetingId}`;
+
+      // Create meeting date/time based on preferred date and time
+      const meetingDate = consultation.preferred_date || new Date().toISOString().split('T')[0];
+      const meetingTime = consultation.preferred_time || '10:00';
+      const startDateTime = new Date(`${meetingDate}T${meetingTime}`);
+      const endDateTime = new Date(startDateTime.getTime() + 60 * 60 * 1000); // 1 hour later
+
+      // Create meeting in database
+      const { error: meetingError } = await supabase
+        .from('meetings')
+        .insert([{
+          title: `Consultation: ${consultation.service}`,
+          description: `Consultation meeting with ${consultation.name}`,
+          start_time: startDateTime.toISOString(),
+          end_time: endDateTime.toISOString(),
+          meeting_link: googleMeetLink,
+          consultation_id: consultation.id,
+          status: 'scheduled',
+        }]);
+
+      if (meetingError) throw meetingError;
+
+      // Send email notification
+      await supabase.functions.invoke('send-notification', {
+        body: {
+          type: 'meeting_approved',
+          userEmail: consultation.email,
+          userName: consultation.name,
+          data: {
+            service: consultation.service,
+            meetingDate: startDateTime.toLocaleDateString('en-US', { 
+              weekday: 'long', 
+              year: 'numeric', 
+              month: 'long', 
+              day: 'numeric' 
+            }),
+            meetingTime: startDateTime.toLocaleTimeString('en-US', { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            }),
+            meetingLink: googleMeetLink,
+            duration: '1 hour'
+          }
+        }
+      });
+
+      toast({
+        title: "Meeting Scheduled",
+        description: "Meeting created and notification sent to client",
+      });
+    } catch (error) {
+      console.error('Error approving consultation:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create meeting and send notification",
         variant: "destructive",
       });
     }
