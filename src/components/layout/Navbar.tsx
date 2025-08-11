@@ -2,16 +2,23 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Menu, X, Sparkles } from 'lucide-react';
+import { Menu, X, Sparkles, UserCircle, LogOut } from 'lucide-react';
 import { AuthDialog } from '@/components/auth/AuthDialog';
 import { BookingForm } from '@/components/booking/BookingForm';
 import { cn } from '@/lib/utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { supabase } from '@/integrations/supabase/client';
 
 const navItems = [
-  { name: 'Home', href: '/' },
-  { name: 'About', href: '/about' },
-  { name: 'Services', href: '/services' },
-  { name: 'Contact', href: '/contact' },
+  { name: 'Home', href: '/', section: 'hero' },
+  { name: 'About', href: '/about', section: 'about' },
+  { name: 'Services', href: '/services', section: 'services' },
+  { name: 'Contact', href: '/contact', section: 'contact' },
 ];
 
 export const Navbar = () => {
@@ -20,7 +27,55 @@ export const Navbar = () => {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [user, setUser] = useState<{ email: string | null; name: string | null } | null>(null);
   const location = useLocation();
+
+  useEffect(() => {
+    // Check for existing session
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setIsLoggedIn(true);
+        // Get user profile data
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name, email')
+          .eq('id', session.user.id)
+          .single();
+        
+        setUser({
+          email: session.user.email,
+          name: profile?.full_name || session.user.email?.split('@')[0] || 'User'
+        });
+      }
+    };
+
+    checkSession();
+
+    // Subscribe to auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        setIsLoggedIn(true);
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name, email')
+          .eq('id', session.user.id)
+          .single();
+
+        setUser({
+          email: session.user.email,
+          name: profile?.full_name || session.user.email?.split('@')[0] || 'User'
+        });
+      } else if (event === 'SIGNED_OUT') {
+        setIsLoggedIn(false);
+        setUser(null);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -34,6 +89,27 @@ export const Navbar = () => {
   const handleAuthSuccess = () => {
     setIsLoggedIn(true);
     setIsBookingOpen(true);
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setIsLoggedIn(false);
+    setUser(null);
+  };
+
+  const scrollToSection = (sectionId: string) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const handleNavigation = (item: typeof navItems[0], e: React.MouseEvent) => {
+    if (location.pathname === '/' && item.section) {
+      e.preventDefault();
+      scrollToSection(item.section);
+      setIsMenuOpen(false);
+    }
   };
 
   return (
@@ -67,6 +143,7 @@ export const Navbar = () => {
                 <Link
                   key={item.name}
                   to={item.href}
+                  onClick={(e) => handleNavigation(item, e)}
                   className={cn(
                     'relative px-4 py-2 text-sm font-medium transition-all duration-300 group',
                     location.pathname === item.href
@@ -95,13 +172,29 @@ export const Navbar = () => {
 
             {/* Auth Buttons */}
             <div className="hidden md:flex items-center space-x-4">
-              {isLoggedIn ? (
-                <Button
-                  onClick={() => setIsBookingOpen(true)}
-                  className="ripple bg-gradient-primary hover:shadow-neon"
-                >
-                  Book a Call
-                </Button>
+              {isLoggedIn && user ? (
+                <div className="flex items-center space-x-4">
+                  <Button
+                    onClick={() => setIsBookingOpen(true)}
+                    className="ripple bg-gradient-primary hover:shadow-neon"
+                  >
+                    Book a Call
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="flex items-center space-x-2">
+                        <UserCircle className="h-5 w-5" />
+                        <span className="font-medium">{user.name}</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuItem onClick={handleSignOut} className="text-red-500">
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Sign Out
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               ) : (
                 <>
                   <Button
@@ -151,7 +244,7 @@ export const Navbar = () => {
                         ? 'text-primary bg-primary/10'
                         : 'text-foreground/70 hover:text-primary hover:bg-primary/5'
                     )}
-                    onClick={() => setIsMenuOpen(false)}
+                    onClick={(e) => handleNavigation(item, e)}
                   >
                     {item.name}
                   </Link>
@@ -159,16 +252,33 @@ export const Navbar = () => {
 
                 {/* Mobile Auth Buttons */}
                 <div className="mt-6 space-y-3">
-                  {isLoggedIn ? (
-                    <Button
-                      onClick={() => {
-                        setIsBookingOpen(true);
-                        setIsMenuOpen(false);
-                      }}
-                      className="w-full ripple bg-gradient-primary hover:shadow-neon"
-                    >
-                      Book a Call
-                    </Button>
+                  {isLoggedIn && user ? (
+                    <>
+                      <div className="px-4 py-3 text-sm font-medium text-primary bg-primary/10 rounded-lg flex items-center">
+                        <UserCircle className="h-5 w-5 mr-2" />
+                        <span>{user.name}</span>
+                      </div>
+                      <Button
+                        onClick={() => {
+                          setIsBookingOpen(true);
+                          setIsMenuOpen(false);
+                        }}
+                        className="w-full ripple bg-gradient-primary hover:shadow-neon"
+                      >
+                        Book a Call
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          handleSignOut();
+                          setIsMenuOpen(false);
+                        }}
+                        className="w-full ripple text-red-500 border-red-500/30 hover:bg-red-500/10"
+                      >
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Sign Out
+                      </Button>
+                    </>
                   ) : (
                     <>
                       <Button
